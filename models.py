@@ -8,12 +8,11 @@ class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=False)
-    password_hash = db.Column(db.String(200), nullable=False)  # plain for now
+    password_hash = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), nullable=False)  # 'student' or 'teacher'
 
-    # Relationships
-    classes_taught = db.relationship("Class", backref="teacher", lazy=True)  # only for teachers
-    test_attempts = db.relationship("TestAttempt", backref="student", lazy=True)  # only for students
+    classes_taught = db.relationship("Class", backref="teacher", lazy=True)
+    test_attempts = db.relationship("TestAttempt", backref="student", lazy=True)
 
     def __repr__(self):
         return f"<User {self.name} ({self.role})>"
@@ -26,10 +25,8 @@ class Class(db.Model):
     name = db.Column(db.String(100), nullable=False)
     join_code = db.Column(db.String(10), unique=True, nullable=False)
 
-    # Foreign key
     teacher_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
 
-    # Relationships
     students = db.relationship("StudentClass", backref="class_obj", lazy=True, cascade="all, delete-orphan")
     chapters = db.relationship("Chapter", backref="class_obj", lazy=True, cascade="all, delete-orphan")
 
@@ -55,7 +52,6 @@ class Chapter(db.Model):
     name = db.Column(db.String(100), nullable=False)
     class_id = db.Column(db.Integer, db.ForeignKey("class.id"), nullable=False)
 
-    # Relationship
     tests = db.relationship("Test", backref="chapter", lazy=True, cascade="all, delete-orphan")
 
     def __repr__(self):
@@ -73,7 +69,14 @@ class Test(db.Model):
     end_time = db.Column(db.DateTime, nullable=True)
     max_score = db.Column(db.Integer, default=100)
 
-    # Relationship
+    # ✅ NEW: link questions to test
+    questions = db.relationship(
+        "Question",
+        backref="test",
+        lazy=True,
+        cascade="all, delete-orphan"
+    )
+
     attempts = db.relationship("TestAttempt", backref="test", lazy=True, cascade="all, delete-orphan")
 
     def __repr__(self):
@@ -92,3 +95,21 @@ class TestAttempt(db.Model):
 
     def __repr__(self):
         return f"<Attempt student={self.student_id} test={self.test_id} score={self.score}>"
+
+
+class Question(db.Model):
+    __tablename__ = "question"
+
+    id = db.Column(db.Integer, primary_key=True)
+    test_id = db.Column(db.Integer, db.ForeignKey("test.id"), nullable=False)
+
+    text = db.Column(db.Text, nullable=False)
+    option_a = db.Column(db.String(255), nullable=False)
+    option_b = db.Column(db.String(255), nullable=False)
+    option_c = db.Column(db.String(255), nullable=False)
+    option_d = db.Column(db.String(255), nullable=False)
+    correct_option = db.Column(db.String(1), nullable=False)  # "A", "B", "C", or "D"
+    marks = db.Column(db.Integer, default=1)
+
+    def __repr__(self):
+        return f"<Question {self.text[:20]}...>"

@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 
 # Import DB & Models
+from flask_migrate import Migrate
 from models import db, User
 from routes.auth import auth_bp
 from routes.student import student_bp
@@ -17,6 +18,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize DB
 db.init_app(app)
+migrate = Migrate(app, db)
 
 # Login Manager
 login_manager = LoginManager()
@@ -30,7 +32,7 @@ def load_user(user_id):
 # Register Blueprints
 app.register_blueprint(auth_bp)
 app.register_blueprint(student_bp)
-app.register_blueprint(teacher_bp)
+app.register_blueprint(teacher_bp)  # ✅ Teacher routes now live under /teacher/*
 
 # Landing Page
 @app.route("/")
