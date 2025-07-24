@@ -68,7 +68,7 @@ body {
   cursor: pointer;
   transition: background-color 0.3s ease;
   text-decoration: none;
-  width: 30rem;
+  width: 26rem;
 }
 
 .btn-primary:hover {
