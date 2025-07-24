@@ -1,5 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from models import db, Class, Chapter, Test, Question
+# from flask_login import login_required, current_user   # 🔒 Temporarily disabled until auth is ready
+from extensions import db
+from models import Class, Chapter, Test, Question, TestAttempt, User, StudentClass
 
 teacher_bp = Blueprint("teacher", __name__, url_prefix="/teacher")
 
@@ -8,6 +10,7 @@ FAKE_TEACHER_ID = 1
 
 
 @teacher_bp.route("/dashboard")
+# @login_required   # 🔒 Will enable after login is ready
 def dashboard():
     classes = Class.query.filter_by(teacher_id=FAKE_TEACHER_ID).all()
     return render_template("teacher/dashboard.html", classes=classes)
@@ -15,6 +18,7 @@ def dashboard():
 
 # ✅ Create Classroom
 @teacher_bp.route("/class/create", methods=["GET", "POST"])
+# @login_required
 def create_class():
     if request.method == "POST":
         class_name = request.form.get("name")
@@ -30,15 +34,35 @@ def create_class():
     return render_template("teacher/create_class.html")
 
 
-# ✅ View Class & Chapters
+# ✅ View Class with Chapters, Tests & Analytics
 @teacher_bp.route("/class/<int:class_id>")
+# @login_required
 def view_class(class_id):
     class_obj = Class.query.get_or_404(class_id)
-    return render_template("teacher/view_class.html", class_obj=class_obj)
+    enrolled_students = [sc.student for sc in class_obj.students]
+
+    # ✅ Compute analytics for each chapter & test
+    for chapter in class_obj.chapters:
+        chapter_analytics = get_chapter_analytics(chapter.id)
+        chapter.avg_score = chapter_analytics["avg"]
+        chapter.lowest_test_name = chapter_analytics["lowest_test"]
+
+        for test in chapter.tests:
+            t_analytics = get_test_analytics(test.id)
+            test.avg_score = t_analytics["avg"]
+            test.highest_score = t_analytics["highest"]
+            test.lowest_score = t_analytics["lowest"]
+
+    return render_template(
+        "teacher/view_class.html",
+        class_obj=class_obj,
+        enrolled_students=enrolled_students
+    )
 
 
 # ✅ Create Chapter
 @teacher_bp.route("/class/<int:class_id>/create_chapter", methods=["GET", "POST"])
+# @login_required
 def create_chapter(class_id):
     class_obj = Class.query.get_or_404(class_id)
 
@@ -56,6 +80,7 @@ def create_chapter(class_id):
 
 # ✅ Create Test inside a Chapter
 @teacher_bp.route("/chapter/<int:chapter_id>/create_test", methods=["GET", "POST"])
+# @login_required
 def create_test(chapter_id):
     chapter_obj = Chapter.query.get_or_404(chapter_id)
 
@@ -72,11 +97,11 @@ def create_test(chapter_id):
 
 
 @teacher_bp.route("/test/<int:test_id>/manage", methods=["GET", "POST"])
+# @login_required
 def manage_test(test_id):
     test_obj = Test.query.get_or_404(test_id)
     questions = Question.query.filter_by(test_id=test_id).all()
 
-    # Calculate current total marks
     current_total_marks = sum(q.marks for q in questions if hasattr(q, "marks") and q.marks)
 
     if request.method == "POST":
@@ -88,9 +113,8 @@ def manage_test(test_id):
         correct_opt = request.form.get("correct_option")
         marks = int(request.form.get("marks") or 1)
 
-        # ✅ Validate total marks <= test.max_score
         if current_total_marks + marks > test_obj.max_score:
-            flash(f"Cannot add question! Total marks would exceed max score ({test_obj.max_score}).", "danger")
+            flash(f"❌ Cannot add question! Total marks would exceed max score ({test_obj.max_score}).", "danger")
             return redirect(url_for("teacher.manage_test", test_id=test_id))
 
         new_q = Question(
@@ -101,14 +125,13 @@ def manage_test(test_id):
             option_c=opt_c,
             option_d=opt_d,
             correct_option=correct_opt,
+            marks=marks
         )
-        # ✅ Add marks field if not already in model
-        new_q.marks = marks  
 
         db.session.add(new_q)
         db.session.commit()
 
-        flash("Question added successfully!", "success")
+        flash("✅ Question added successfully!", "success")
         return redirect(url_for("teacher.manage_test", test_id=test_id))
 
     return render_template(
@@ -119,9 +142,9 @@ def manage_test(test_id):
     )
 
 
-
 # ✅ Delete Question
 @teacher_bp.route("/question/<int:question_id>/delete", methods=["POST"])
+# @login_required
 def delete_question(question_id):
     question = Question.query.get_or_404(question_id)
     test_id = question.test_id
@@ -135,6 +158,7 @@ def delete_question(question_id):
 
 # ✅ Edit Question
 @teacher_bp.route("/question/<int:question_id>/edit", methods=["POST"])
+# @login_required
 def edit_question(question_id):
     question = Question.query.get_or_404(question_id)
 
@@ -149,12 +173,12 @@ def edit_question(question_id):
     flash("✅ Question updated!", "success")
     return redirect(url_for("teacher.manage_test", test_id=question.test_id))
 
+
 @teacher_bp.route("/test/<int:test_id>/delete", methods=["POST"])
+# @login_required
 def delete_test(test_id):
     test = Test.query.get_or_404(test_id)
-    
-    # ✅ Get class_id BEFORE deletion
-    class_id = test.chapter.class_id  
+    class_id = test.chapter.class_id  # get before deleting
 
     db.session.delete(test)
     db.session.commit()
@@ -163,3 +187,96 @@ def delete_test(test_id):
     return redirect(url_for("teacher.view_class", class_id=class_id))
 
 
+# ✅ View all students in a class with analytics
+@teacher_bp.route("/class/<int:class_id>/students")
+# @login_required
+def class_students(class_id):
+    class_obj = Class.query.get_or_404(class_id)
+
+    students = (
+        db.session.query(User)
+        .join(StudentClass)
+        .filter(StudentClass.class_id == class_id, User.role == "student")
+        .all()
+    )
+
+    student_analytics = []
+    for student in students:
+        attempts = (
+            db.session.query(TestAttempt)
+            .join(Test)
+            .join(Chapter)
+            .filter(
+                TestAttempt.student_id == student.id,
+                Chapter.class_id == class_id
+            )
+            .all()
+        )
+
+        total_attempts = len(attempts)
+        total_score = sum(a.score for a in attempts)
+        avg_score = round(total_score / total_attempts, 2) if total_attempts else 0
+
+        weak_topics = []
+        strong_topics = []
+
+        for attempt in attempts:
+            percentage = (attempt.score / attempt.test.max_score) * 100 if attempt.test.max_score else 0
+            if percentage < 50:
+                weak_topics.append(attempt.test.name)
+            elif percentage >= 80:
+                strong_topics.append(attempt.test.name)
+
+        student_analytics.append({
+            "student": student,
+            "total_attempts": total_attempts,
+            "avg_score": avg_score,
+            "weak_topics": weak_topics,
+            "strong_topics": strong_topics
+        })
+
+    return render_template(
+        "teacher/class_students.html",
+        class_obj=class_obj,
+        student_analytics=student_analytics
+    )
+
+
+# ✅ Analytics helpers
+def get_test_analytics(test_id):
+    attempts = TestAttempt.query.filter_by(test_id=test_id).all()
+    if not attempts:
+        return {"avg": None, "highest": None, "lowest": None, "count": 0}
+
+    scores = [a.score for a in attempts]
+    return {
+        "avg": round(sum(scores) / len(scores), 2),
+        "highest": max(scores),
+        "lowest": min(scores),
+        "count": len(scores)
+    }
+
+
+def get_chapter_analytics(chapter_id):
+    tests = Test.query.filter_by(chapter_id=chapter_id).all()
+    if not tests:
+        return {"avg": None, "lowest_test": None, "total_tests": 0}
+
+    all_scores = []
+    test_scores = {}
+    for test in tests:
+        t_analytics = get_test_analytics(test.id)
+        if t_analytics["avg"] is not None:
+            all_scores.append(t_analytics["avg"])
+            test_scores[test.name] = t_analytics["avg"]
+
+    if not all_scores:
+        return {"avg": None, "lowest_test": None, "total_tests": len(tests)}
+
+    lowest_test = min(test_scores, key=test_scores.get)
+
+    return {
+        "avg": round(sum(all_scores) / len(all_scores), 2),
+        "lowest_test": lowest_test,
+        "total_tests": len(tests)
+    }
