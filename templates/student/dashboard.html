@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-12">
+  
+  <!-- Page Title -->
+  <h1 class="text-3xl font-bold text-gray-800 text-center mb-8">
+    Your Learning Dashboard
+  </h1>
+
+  <!-- Join Class Form -->
+  <div class="bg-white shadow-md rounded-xl p-6 mb-10">
+    <h2 class="text-xl font-semibold text-gray-700 mb-4">Join a Class</h2>
+    <form method="POST" action="{{ url_for('student.join_class') }}" class="flex flex-col sm:flex-row gap-4">
+      <input 
+        type="text" 
+        name="join_code" 
+        placeholder="Enter class join code"
+        class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+        required
+      >
+      <button 
+        type="submit"
+        class="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition"
+      >
+        Join Class
+      </button>
+    </form>
+  </div>
+
+  <!-- Enrolled Classes -->
+  <h2 class="text-2xl font-semibold text-gray-800 mb-6">Your Enrolled Classes</h2>
+
+  {% if classes %}
+  <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    {% for cls in classes %}
+    <div class="bg-white shadow-md rounded-xl p-6 hover:shadow-lg transition">
+      <h3 class="text-xl font-semibold text-gray-800">{{ cls.name }}</h3>
+      <p class="text-gray-500 mt-2 text-sm">
+        {{ cls.description or "No description available." }}
+      </p>
+      <a 
+        href="{{ url_for('student.class_detail', class_id=cls.id) }}"
+        class="inline-block mt-4 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition"
+      >
+        View Class →
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-12 text-gray-500">
+    <p>You haven't joined any classes yet. Use the join code above to enroll.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
