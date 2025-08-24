@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-12">
+  
+  <!-- Class Title -->
+  <h1 class="text-3xl font-bold text-gray-800 text-center mb-8">
+    {{ class_obj.name }}
+  </h1>
+
+  <!-- Chapters & Tests -->
+  <div class="space-y-10">
+    {% for chapter in chapters %}
+    <div class="bg-white shadow-md rounded-xl p-6">
+      <h2 class="text-2xl font-semibold text-gray-700 mb-4">{{ chapter.name }}</h2>
+
+      {% if chapter.tests %}
+      <div class="grid gap-4 sm:grid-cols-2">
+        {% for test in chapter.tests %}
+        <div class="border rounded-lg p-5 hover:shadow-md transition">
+          <h3 class="text-lg font-medium text-gray-800">{{ test.name }}</h3>
+          <p class="text-sm text-gray-500 mt-1">
+            Available: 
+            {{ test.start_time.strftime('%d %b %Y %H:%M') if test.start_time else 'Now' }} 
+            - 
+            {{ test.end_time.strftime('%d %b %Y %H:%M') if test.end_time else 'No deadline' }}
+          </p>
+          <a 
+            href="{{ url_for('student.start_test', test_id=test.id, question_index=0) }}"
+            class="inline-block mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm transition"
+          >
+            Start Test →
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-gray-500 text-sm">No tests available for this chapter yet.</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Assignments -->
+  <div class="mt-12">
+    <h2 class="text-2xl font-semibold text-gray-800 mb-6">Assignments</h2>
+    {% if assignments %}
+    <div class="space-y-4">
+      {% for assignment in assignments %}
+      <div class="bg-white shadow p-5 rounded-lg">
+        <h3 class="text-lg font-medium text-gray-700">{{ assignment.title }}</h3>
+        <p class="text-gray-500 text-sm mt-1">{{ assignment.description }}</p>
+        {% if assignment.due_date %}
+        <p class="text-xs text-red-500 mt-1">Due: {{ assignment.due_date.strftime('%d %b %Y %H:%M') }}</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray-500 text-sm">No assignments yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

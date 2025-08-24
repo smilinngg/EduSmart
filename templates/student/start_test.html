@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="flex flex-col lg:flex-row h-[calc(100vh-80px)]">
+
+  <!-- LEFT: Main Question Panel -->
+  <div class="flex-1 bg-white p-6 overflow-y-auto">
+
+    <!-- Test Info + Global Timer -->
+    <div class="flex justify-between items-center border-b pb-4 mb-6">
+      <h1 class="text-xl font-semibold text-gray-800">{{ test.name }}</h1>
+      <div class="flex items-center gap-2 text-lg font-bold text-red-500">
+        ⏳ Time Left: <span id="exam-timer"></span>
+      </div>
+    </div>
+
+    <!-- Question -->
+    <div class="mb-6">
+      <h2 class="text-lg font-medium text-gray-800">
+        Q{{ current_index + 1 }}. {{ current_question.text }}
+      </h2>
+    </div>
+
+    <!-- Options -->
+    <form method="POST" class="space-y-4" id="exam-form">
+      {% for option in options_list %}
+      <label class="option-label flex items-center gap-3 p-4 border rounded-lg cursor-pointer transition hover:border-blue-500 hover:bg-blue-50">
+        <input 
+          type="radio" 
+          name="selected_option" 
+          value="{{ option }}" 
+          class="hidden option-input"
+        >
+        <div class="w-5 h-5 rounded-full border flex items-center justify-center">
+          <span class="dot hidden w-3 h-3 rounded-full bg-blue-600"></span>
+        </div>
+        <span class="text-gray-800">{{ option }}</span>
+      </label>
+      {% endfor %}
+
+      <!-- Navigation Buttons -->
+      <div class="flex flex-wrap justify-between mt-8 gap-4">
+        {% if current_index > 0 %}
+        <a 
+          href="{{ url_for('student.start_test', test_id=test.id, question_index=current_index-1) }}"
+          class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition"
+        >
+          ← Previous
+        </a>
+        {% else %}
+        <span></span>
+        {% endif %}
+
+        <div class="flex gap-3">
+          <button 
+            type="button"
+            id="mark-review-btn"
+            class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition"
+          >
+            Mark for Review
+          </button>
+          
+          {% if current_index + 1 < total_questions %}
+          <button 
+            type="submit"
+            class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+          >
+            Save & Next →
+          </button>
+          {% else %}
+          <button 
+            type="submit"
+            class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+          >
+            ✅ Final Submit
+          </button>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- RIGHT: Question Sidebar -->
+  <div class="w-full lg:w-72 bg-gray-100 p-4 border-l flex flex-col">
+    <h3 class="text-lg font-semibold text-gray-700 mb-4">Questions</h3>
+
+    <!-- Question Number Grid -->
+    <div id="question-grid" class="grid grid-cols-5 gap-2 mb-4">
+      {% for i in range(total_questions) %}
+      <a 
+        href="{{ url_for('student.start_test', test_id=test.id, question_index=i) }}"
+        data-qnum="{{ i }}"
+        class="q-btn flex justify-center items-center h-10 rounded border text-sm font-medium
+          {% if i == current_index %} border-blue-600 bg-blue-100
+          {% else %} bg-white border-gray-300 {% endif %}"
+      >
+        {{ i+1 }}
+      </a>
+      {% endfor %}
+    </div>
+
+    <!-- Status Legend -->
+    <div class="mt-auto text-sm space-y-2">
+      <p><span class="inline-block w-4 h-4 bg-gray-300 mr-2"></span> Not Visited</p>
+      <p><span class="inline-block w-4 h-4 bg-red-500 mr-2"></span> Visited but Not Answered</p>
+      <p><span class="inline-block w-4 h-4 bg-green-500 mr-2"></span> Answered</p>
+      <p><span class="inline-block w-4 h-4 bg-yellow-500 mr-2"></span> Marked for Review</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ✅ Global Timer (same across pages) */
+let totalSeconds = localStorage.getItem("exam_timer") ? parseInt(localStorage.getItem("exam_timer")) : (25 * 60);
+
+function updateTimer() {
+  let minutes = Math.floor(totalSeconds / 60);
+  let seconds = totalSeconds % 60;
+  document.getElementById("exam-timer").textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  if (totalSeconds <= 0) {
+    alert("⏰ Time is up! Auto submitting test...");
+    document.getElementById("exam-form").submit();
+  } else {
+    totalSeconds--;
+    localStorage.setItem("exam_timer", totalSeconds);
+  }
+}
+setInterval(updateTimer, 1000);
+
+/* ✅ Load saved answers & question states */
+let answers = JSON.parse(localStorage.getItem("answers") || "{}");
+let states = JSON.parse(localStorage.getItem("qStates") || "{}");
+const currentQ = "{{ current_index }}";
+
+/* ✅ Restore selected option if revisited */
+if (answers[`q${currentQ}`]) {
+  let selectedVal = answers[`q${currentQ}`];
+  document.querySelectorAll("input[name='selected_option']").forEach(opt => {
+    if (opt.value === selectedVal) {
+      opt.checked = true;
+      opt.parentNode.querySelector(".dot").classList.remove("hidden");
+    }
+  });
+}
+
+/* ✅ When an option is clicked → show dot + mark answered */
+document.querySelectorAll(".option-label").forEach(label => {
+  let input = label.querySelector("input.option-input");
+  input.addEventListener("change", function () {
+    document.querySelectorAll(".option-label .dot").forEach(dot => dot.classList.add("hidden"));
+    label.querySelector(".dot").classList.remove("hidden");
+
+    states[`q${currentQ}`] = "answered";
+    answers[`q${currentQ}`] = this.value;
+
+    localStorage.setItem("answers", JSON.stringify(answers));
+    localStorage.setItem("qStates", JSON.stringify(states));
+
+    refreshGrid();
+  });
+});
+
+/* ✅ Mark for Review */
+document.getElementById("mark-review-btn").addEventListener("click", function () {
+  states[`q${currentQ}`] = "review";
+  localStorage.setItem("qStates", JSON.stringify(states));
+  refreshGrid();
+});
+
+/* ✅ Mark visited if not answered yet */
+if (!states[`q${currentQ}`]) {
+  states[`q${currentQ}`] = "visited";
+  localStorage.setItem("qStates", JSON.stringify(states));
+}
+
+/* ✅ Update sidebar colors */
+function refreshGrid() {
+  document.querySelectorAll(".q-btn").forEach(btn => {
+    const qnum = btn.dataset.qnum;
+    const state = states[`q${qnum}`] || "not";
+
+    btn.className = "q-btn flex justify-center items-center h-10 rounded border text-sm font-medium"; // reset classes
+
+    if (state === "not") {
+      btn.classList.add("bg-gray-300");
+    } else if (state === "visited") {
+      btn.classList.add("bg-red-500", "text-white");
+    } else if (state === "answered") {
+      btn.classList.add("bg-green-500", "text-white");
+    } else if (state === "review") {
+      btn.classList.add("bg-yellow-500", "text-white");
+    }
+  });
+}
+refreshGrid();
+
+/* ✅ Save states before leaving */
+window.addEventListener("beforeunload", function () {
+  localStorage.setItem("answers", JSON.stringify(answers));
+  localStorage.setItem("qStates", JSON.stringify(states));
+});
+</script>
+
+{% endblock %}
