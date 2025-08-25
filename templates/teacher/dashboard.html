@@ -22,7 +22,7 @@
 
     <!-- List of Classes -->
     {% if classes %}
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
             {% for c in classes %}
             {% set gradients = [
                 'from-indigo-700 to-purple-700', 
@@ -48,94 +48,67 @@
         <p class="text-gray-500 text-center mt-10 text-lg">No classes created yet. Click the button above to create one!</p>
     {% endif %}
 
-    <!-- Analytics Section -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <!-- Bar Chart: Class Performance -->
-        <div class="bg-white p-6 rounded-2xl shadow-lg">
-            <h2 class="text-xl font-bold mb-4 text-gray-700">Class Performance</h2>
-            <canvas id="performanceChart" class="w-full h-64"></canvas>
-        </div>
+    <!-- Analytics Section (Always at Bottom) -->
+    <div class="mt-16">
+        <h2 class="text-2xl font-bold mb-6 text-gray-800">Analytics Overview</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            <!-- Bar Chart -->
+            <div class="bg-white p-6 rounded-2xl shadow-lg">
+                <h3 class="text-xl font-bold mb-4 text-gray-700">Class Performance</h3>
+                <canvas id="performanceChart" class="w-full h-64"></canvas>
+            </div>
 
-        <!-- Pie Chart: Attendance -->
-        <div class="bg-white p-6 rounded-2xl shadow-lg">
-            <h2 class="text-xl font-bold mb-4 text-gray-700">Attendance Overview</h2>
-            <canvas id="attendanceChart" class="w-full h-64"></canvas>
+            <!-- Pie Chart -->
+            <div class="bg-white p-6 rounded-2xl shadow-lg">
+                <h3 class="text-xl font-bold mb-4 text-gray-700">Attendance Overview</h3>
+                <canvas id="attendanceChart" class="w-full h-64"></canvas>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Chart.js Script -->
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    // Prepare class names and scores dynamically
-    const classLabels = [
-        {% for c in classes %}
-            "{{ c.name }}",
-        {% endfor %}
-    ];
+    const classLabels = [{% for c in classes %}"{{ c.name }}",{% endfor %}];
+    const classScores = [{% for c in classes %}{{ c.average_score if c.average_score else 0 }},{% endfor %}];
+    const classAttendance = [{% for c in classes %}{{ c.attendance_percentage if c.attendance_percentage else 0 }},{% endfor %}];
 
-    const classScores = [
-        {% for c in classes %}
-            {{ c.average_score if c.average_score else 0 }},
-        {% endfor %}
-    ];
-
-    const classAttendance = [
-        {% for c in classes %}
-            {{ c.attendance_percentage if c.attendance_percentage else 0 }},
-        {% endfor %}
-    ];
-
-    // Bar Chart: Class Performance
-    const ctxPerformance = document.getElementById('performanceChart').getContext('2d');
-    const performanceChart = new Chart(ctxPerformance, {
+    // Performance Chart
+    new Chart(document.getElementById('performanceChart').getContext('2d'), {
         type: 'bar',
         data: {
             labels: classLabels,
             datasets: [{
                 label: 'Average Score',
                 data: classScores,
-                backgroundColor: classLabels.map((_, i) => {
-                    const colors = [
-                        'rgba(99, 102, 241, 0.7)',
-                        'rgba(139, 92, 246, 0.7)',
-                        'rgba(236, 72, 153, 0.7)',
-                        'rgba(16, 185, 129, 0.7)',
-                        'rgba(234, 179, 8, 0.7)',
-                        'rgba(59, 130, 246, 0.7)'
-                    ];
-                    return colors[i % colors.length];
-                }),
+                backgroundColor: [
+                    'rgba(99, 102, 241, 0.7)','rgba(139, 92, 246, 0.7)',
+                    'rgba(236, 72, 153, 0.7)','rgba(16, 185, 129, 0.7)',
+                    'rgba(234, 179, 8, 0.7)','rgba(59, 130, 246, 0.7)'
+                ],
                 borderRadius: 8
             }]
         },
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, max: 100 } }
-        }
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 100 } } }
     });
 
-    // Pie Chart: Attendance
-    const ctxAttendance = document.getElementById('attendanceChart').getContext('2d');
-    const attendanceChart = new Chart(ctxAttendance, {
+    // Attendance Chart
+    new Chart(document.getElementById('attendanceChart').getContext('2d'), {
         type: 'pie',
         data: {
             labels: classLabels,
             datasets: [{
-                label: 'Attendance %',
                 data: classAttendance,
                 backgroundColor: [
-                    'rgba(99, 102, 241, 0.7)',
-                    'rgba(139, 92, 246, 0.7)',
-                    'rgba(236, 72, 153, 0.7)',
-                    'rgba(16, 185, 129, 0.7)',
-                    'rgba(234, 179, 8, 0.7)',
-                    'rgba(59, 130, 246, 0.7)'
+                    'rgba(99, 102, 241, 0.7)','rgba(139, 92, 246, 0.7)',
+                    'rgba(236, 72, 153, 0.7)','rgba(16, 185, 129, 0.7)',
+                    'rgba(234, 179, 8, 0.7)','rgba(59, 130, 246, 0.7)'
                 ]
             }]
         },
         options: { responsive: true }
     });
 </script>
-{% endblock %}  
+{% endblock %}
